@@ -39,15 +39,18 @@ jobs:
 
       - name: Verify the executable
         shell: pwsh
+        env:
+          # The runner has no interactive desktop, so the overlay is drawn offscreen.
+          QT_QPA_PLATFORM: offscreen
         run: |
           $exe = if ("${{ matrix.variant }}" -eq "onefile") {
             "dist\os-overlay-onefile\os-overlay.exe"
           } else {
             "dist\os-overlay-onedir\os-overlay.exe"
           }
-          & $exe --self-test
-          if ($LASTEXITCODE -ne 0) {
-            Write-Error "The self test failed"
+          $process = Start-Process -FilePath $exe -ArgumentList "--self-test" -Wait -PassThru
+          if ($process.ExitCode -ne 0) {
+            Write-Error "The self test failed with exit code $($process.ExitCode)"
             exit 1
           }
 
