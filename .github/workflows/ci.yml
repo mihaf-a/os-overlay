@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Lint
+        run: python -m ruff check .
+
+      - name: Check formatting
+        run: python -m ruff format --check .
+
+      - name: Test
+        run: python -m pytest
+
+  build:
+    needs: check
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        variant: [onedir, onefile]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Build
+        run: python -m PyInstaller --noconfirm os_overlay.spec
+        env:
+          OS_OVERLAY_ONEFILE: ${{ matrix.variant == 'onefile' && '1' || '0' }}
+
+      - name: Verify the executable
+        shell: pwsh
+        run: |
+          $exe = if ("${{ matrix.variant }}" -eq "onefile") {
+            "dist\os-overlay-onefile\os-overlay.exe"
+          } else {
+            "dist\os-overlay-onedir\os-overlay.exe"
+          }
+          & $exe --self-test
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "The self test failed"
+            exit 1
+          }
+
+      - name: Collect the executable
+        shell: pwsh
+        run: |
+          $target = if ("${{ matrix.variant }}" -eq "onefile") {
+            "dist\os-overlay-onefile\os-overlay.exe"
+          } else {
+            "dist\os-overlay-onedir\os-overlay.exe"
+          }
+          if (-not (Test-Path $target)) {
+            Write-Error "The executable was not produced at $target"
+            exit 1
+          }
+          New-Item -ItemType Directory -Force -Path "artifact\${{ matrix.variant }}" | Out-Null
+          if ("${{ matrix.variant }}" -eq "onefile") {
+            Copy-Item $target "artifact\${{ matrix.variant }}\"
+          } else {
+            Copy-Item "dist\os-overlay-onedir\*" "artifact\${{ matrix.variant }}\os-overlay" -Recurse
+          }
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: os-overlay-${{ matrix.variant }}
+          path: artifact/${{ matrix.variant }}

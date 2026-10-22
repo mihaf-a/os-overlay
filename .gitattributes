@@ -1,0 +1,9 @@
+# Keep the line endings in the repository the same on every platform.
+* text=auto eol=lf
+
+# Binary assets are never converted.
+*.ico binary
+*.png binary
+*.gif binary
+*.jpg binary
+*.jpeg binary
