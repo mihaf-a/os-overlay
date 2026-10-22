@@ -74,7 +74,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: release-${{ matrix.variant }}
-          path: release/${{ matrix.variant }}.zip
+          path: release/os-overlay-${{ matrix.variant }}.zip
+          if-no-files-found: error
 
   publish:
     needs: release
@@ -89,6 +90,7 @@ jobs:
         with:
           path: artifacts
           merge-multiple: true
+          pattern: release-*
 
       - name: Create the release
         uses: softprops/action-gh-release@v2
